@@ -4,20 +4,60 @@ const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerH
 const canvas = document.getElementById('vr-canvas');
 const renderer = new THREE.WebGLRenderer({ antialias: true, canvas: canvas });
 let orbitControls = null; // Three.js OrbitControls instance (if available)
-const cubeGeometry = new THREE.BoxGeometry();
-const cubeMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+
+// We'll create a cylinder (el "tejo") and a rectangular cancha (suelo)
+let cylinder = null;
+let court = null;
 
 let vrEnabled = false;
 
 // Controller reference for VR interaction
 let controller1 = null;
 
+// Simple physics bookkeeping
+const gravity = -9.81; // m/s^2 (arbitrary scale)
+const physicsObjects = []; // objects with .userData.velocity and .userData.isHeld
+const clock = new THREE.Clock();
+
 function init() {
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
-    scene.add(cube);
-    camera.position.z = 5;
+    camera.position.set(0, 1.6, 4);
+
+    // Lights
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+    hemi.position.set(0, 20, 0);
+    scene.add(hemi);
+    const dir = new THREE.DirectionalLight(0xffffff, 0.6);
+    dir.position.set(-3, 10, -10);
+    scene.add(dir);
+
+    // Create a rectangular court (plane) - visible as a thin box
+    const courtWidth = 6;
+    const courtDepth = 3;
+    const courtHeight = 0.02;
+    const courtGeometry = new THREE.BoxGeometry(courtWidth, courtHeight, courtDepth);
+    const courtMaterial = new THREE.MeshStandardMaterial({ color: 0x2e8b57 });
+    court = new THREE.Mesh(courtGeometry, courtMaterial);
+    court.position.y = 0; // top surface at y=0
+    court.receiveShadow = true;
+    scene.add(court);
+
+    // Create the cylinder (tejo)
+    const cylRadius = 0.18;
+    const cylHeight = 0.06;
+    const cylGeometry = new THREE.CylinderGeometry(cylRadius, cylRadius, cylHeight, 32);
+    const cylMaterial = new THREE.MeshStandardMaterial({ color: 0xff8c00 });
+    cylinder = new THREE.Mesh(cylGeometry, cylMaterial);
+    cylinder.castShadow = true;
+    cylinder.position.set(0, 0.5, 0);
+    scene.add(cylinder);
+
+    // physics userdata
+    cylinder.userData.velocity = new THREE.Vector3(0, 0, 0);
+    cylinder.userData.isHeld = false;
+    cylinder.userData.prevWorldPos = new THREE.Vector3();
+    physicsObjects.push(cylinder);
 
     // If OrbitControls is available (loaded from examples), create it
     try {
@@ -64,14 +104,35 @@ function onWindowResize() {
 }
 
 function animate() {
+    const delta = clock.getDelta();
+
     // update orbit controls (smooth damping)
     if (orbitControls) orbitControls.update();
 
-    // rotate cube only when VR mode enabled (previous behavior)
-    if (vrEnabled) {
-        cube.rotation.x += 0.01;
-        cube.rotation.y += 0.01;
-    }
+    // Physics integration for simple gravity and floor collision
+    physicsObjects.forEach((obj) => {
+        if (!obj) return;
+        if (obj.userData.isHeld) {
+            // when held, keep prevWorldPos updated so we can compute release velocity
+            obj.getWorldPosition(obj.userData.prevWorldPos);
+            return;
+        }
+
+        // integrate velocity (gravity)
+        obj.userData.velocity.y += gravity * delta;
+
+        // integrate position
+        obj.position.addScaledVector(obj.userData.velocity, delta);
+
+        // simple collision with court top surface at y = (cylinder half-height)
+        const halfHeight = (obj.geometry.parameters.height || 0.06) / 2;
+        const minY = halfHeight; // court top is at y=0, so min center y is halfHeight
+        if (obj.position.y <= minY) {
+            obj.position.y = minY;
+            obj.userData.velocity.y = 0;
+        }
+    });
+
     renderer.render(scene, camera);
 }
 
@@ -89,29 +150,42 @@ function stopVR() {
 init();
 // Initialize controls if they were loaded before this script
 if (typeof initControls === 'function') {
-    initControls(cube);
+    initControls(cylinder);
 }
 
 // ----- VR controller interaction helpers -----
 function onSelectStart(event) {
     const controller = event.target;
-    // Attach cube to controller so user can move it while holding the select button
+    // Attach cylinder to controller so user can move it while holding the select button
     try {
-        controller.add(cube);
+        // preserve world transform when parenting
+        controller.add(cylinder);
         controller.userData.isSelecting = true;
+        cylinder.userData.isHeld = true;
+        // record prevWorldPos for release velocity
+        cylinder.getWorldPosition(cylinder.userData.prevWorldPos);
     } catch (e) {
-        console.warn('Could not attach cube to controller:', e && e.message);
+        console.warn('Could not attach cylinder to controller:', e && e.message);
     }
 }
 
 function onSelectEnd(event) {
     const controller = event.target;
     controller.userData.isSelecting = false;
-    // Detach cube and reattach to scene while preserving world transform
+    // Detach cylinder and reattach to scene while preserving world transform
     try {
-        scene.attach(cube);
+        // compute release velocity from prevWorldPos -> current world pos
+        const worldPos = new THREE.Vector3();
+        cylinder.getWorldPosition(worldPos);
+        const dt = Math.max(clock.getDelta(), 1e-6);
+        const v = worldPos.clone().sub(cylinder.userData.prevWorldPos).divideScalar(dt);
+        // reattach to scene keeping world transform
+        scene.attach(cylinder);
+        cylinder.userData.isHeld = false;
+        // set physics velocity (use only Y and X/Z from computed v)
+        cylinder.userData.velocity.copy(v);
     } catch (e) {
-        console.warn('Could not detach cube from controller:', e && e.message);
+        console.warn('Could not detach cylinder from controller:', e && e.message);
     }
 }
 
