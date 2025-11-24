@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebVR Cube</title>
+    <link rel="stylesheet" href="src/css/styles.css">
+    <!-- tiny inline SVG favicon to avoid 404 requests for /favicon.ico -->
+    <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%2300ff00'/></svg>">
+</head>
+<body>
+    <canvas id="vr-canvas"></canvas>
+    <div id="controls">
+        <button id="enter-vr">Entrar inmersión</button>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls (Three.js examples) -->
+    <script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+    <!-- load controls first so they expose a global initControls, then app can call it -->
+    <script src="src/js/controls.js"></script>
+    <script src="src/js/app.js"></script>
+</body>
+</html>
