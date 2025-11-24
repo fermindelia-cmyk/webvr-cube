@@ -18,6 +18,8 @@ let controller1 = null;
 const gravity = -9.81; // m/s^2 (arbitrary scale)
 const physicsObjects = []; // objects with .userData.velocity and .userData.isHeld
 const clock = new THREE.Clock();
+// scale applied to release velocity so the object gains noticeable momentum on let-go
+const releaseVelocityScale = 1.6;
 
 function init() {
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -57,6 +59,8 @@ function init() {
     cylinder.userData.velocity = new THREE.Vector3(0, 0, 0);
     cylinder.userData.isHeld = false;
     cylinder.userData.prevWorldPos = new THREE.Vector3();
+    // angular velocity for spinning the cylinder (rad/s)
+    cylinder.userData.angularVelocity = new THREE.Vector3(0, 0, 0);
     physicsObjects.push(cylinder);
 
     // If OrbitControls is available (loaded from examples), create it
@@ -124,6 +128,17 @@ function animate() {
         // integrate position
         obj.position.addScaledVector(obj.userData.velocity, delta);
 
+        // integrate angular velocity into rotation
+        if (obj.userData.angularVelocity) {
+            const angle = obj.userData.angularVelocity.length();
+            if (angle > 0.001) {
+                const axis = obj.userData.angularVelocity.clone().normalize();
+                const q = new THREE.Quaternion();
+                q.setFromAxisAngle(axis, angle * delta);
+                obj.quaternion.multiplyQuaternions(q, obj.quaternion);
+            }
+        }
+
         // simple collision with court top surface at y = (cylinder half-height)
         const halfHeight = (obj.geometry.parameters.height || 0.06) / 2;
         const minY = halfHeight; // court top is at y=0, so min center y is halfHeight
@@ -179,17 +194,22 @@ function onSelectEnd(event) {
         cylinder.getWorldPosition(worldPos);
         const dt = Math.max(clock.getDelta(), 1e-6);
         const v = worldPos.clone().sub(cylinder.userData.prevWorldPos).divideScalar(dt);
+        // amplify release velocity so the tejo gains momentum when released
+        v.multiplyScalar(releaseVelocityScale);
         // reattach to scene keeping world transform
         scene.attach(cylinder);
         cylinder.userData.isHeld = false;
         // set physics velocity (use only Y and X/Z from computed v)
         cylinder.userData.velocity.copy(v);
+        // compute angular velocity from the lateral momentum (perpendicular to throw direction)
+        // spin around the Y axis based on X/Z velocity magnitude
+        const lateralSpeed = Math.sqrt(v.x * v.x + v.z * v.z);
+        const spinAxis = new THREE.Vector3(0, 1, 0);
+        cylinder.userData.angularVelocity.copy(spinAxis).multiplyScalar(lateralSpeed * 3);
     } catch (e) {
         console.warn('Could not detach cylinder from controller:', e && e.message);
     }
-}
-
-// Simple XR button wiring: request an immersive-vr session and set it on the renderer
+}// Simple XR button wiring: request an immersive-vr session and set it on the renderer
 function setupXRButton(button) {
     if (!('xr' in navigator)) {
         button.textContent = 'WebXR no soportado';

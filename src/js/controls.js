@@ -5,6 +5,7 @@ function initControls(object) {
     let isDragging = false;
     let dragOffset = new THREE.Vector3();
     let lastTime = performance.now();
+    const releaseVelocityScale = 1.6; // same-purpose scale as in app.js
     const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // horizontal plane
     const intersection = new THREE.Vector3();
 
@@ -36,7 +37,10 @@ function initControls(object) {
         getMousePos(event);
         raycaster.setFromCamera(mouse, camera);
         // project onto a horizontal plane at the current object's height
-        const worldY = object.getWorldPosition(new THREE.Vector3()).y;
+        // sample current world position BEFORE moving so we can compute velocity at release
+        object.getWorldPosition(object.userData.prevWorldPos);
+        lastTime = performance.now();
+        const worldY = object.userData.prevWorldPos.y;
         plane.set(new THREE.Vector3(0, 1, 0), -worldY);
         if (raycaster.ray.intersectPlane(plane, intersection)) {
             const target = intersection.clone().add(dragOffset);
@@ -55,10 +59,13 @@ function initControls(object) {
         const worldPos = new THREE.Vector3();
         object.getWorldPosition(worldPos);
         const v = worldPos.clone().sub(object.userData.prevWorldPos).divideScalar(dt);
+        v.multiplyScalar(releaseVelocityScale);
         object.userData.velocity.copy(v);
-    }
-
-    function onMouseOut(event) {
+        // compute angular velocity from lateral momentum (spin around Y axis)
+        const lateralSpeed = Math.sqrt(v.x * v.x + v.z * v.z);
+        const spinAxis = new THREE.Vector3(0, 1, 0);
+        object.userData.angularVelocity.copy(spinAxis).multiplyScalar(lateralSpeed * 3);
+    }    function onMouseOut(event) {
         onMouseUp(event);
     }
 
