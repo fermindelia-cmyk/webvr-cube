@@ -13,9 +13,18 @@
     <div id="controls">
         <button id="enter-vr">Entrar inmersión</button>
     </div>
+    <div id="game-info">
+        <div id="game-status">Lanza el TEJITO primero</div>
+        <div id="scores-display">
+            <div id="closest-player">Esperando...</div>
+            <div id="distance-display">Distancia: -</div>
+        </div>
+    </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <!-- OrbitControls (Three.js examples) -->
     <script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+    <!-- RGBELoader for HDRI/EXR support -->
+    <script src="https://threejs.org/examples/js/loaders/RGBELoader.js"></script>
     <!-- load controls first so they expose a global initControls, then app can call it -->
     <script src="src/js/controls.js"></script>
     <script src="src/js/app.js"></script>
