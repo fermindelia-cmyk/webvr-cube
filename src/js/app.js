@@ -185,6 +185,11 @@ function animate() {
             return;
         }
 
+        // Log velocity for debugging
+        if (obj.userData.velocity.length() > 0.1) {
+            console.log(`🎯 ${obj.userData.isTejito ? 'TEJITO' : 'CILINDRO'} moving with velocity:`, obj.userData.velocity.clone().toArray().map(v => v.toFixed(2)));
+        }
+
         // integrate velocity (gravity)
         obj.userData.velocity.y += gravity * delta;
 
@@ -391,3 +396,46 @@ window.updateScoresDisplay = function(playerId, distance) {
         distanceEl.textContent = `Distancia: ${distance.toFixed(2)}m`;
     }
 };
+
+// Reset game function
+window.resetGame = function() {
+    console.log('Resetting game...');
+    
+    // Reset tejito
+    if (tejito) {
+        tejito.position.set(0, 0.15, 0); // Place on ground
+        tejito.userData.velocity.set(0, 0, 0);
+        tejito.userData.angularVelocity.set(0, 0, 0);
+        tejito.userData.isHeld = true; // Ready to throw again
+    }
+    
+    // Reset all cylinders
+    cylinders.forEach((cyl, idx) => {
+        if (cyl && cyl !== tejito) {
+            cyl.position.set(0.3 + idx * 0.2, 0.15, 0);
+            cyl.userData.velocity.set(0, 0, 0);
+            cyl.userData.angularVelocity.set(0, 0, 0);
+            cyl.userData.isHeld = false;
+            cyl.userData.distanceToTejito = Infinity;
+        }
+    });
+    
+    // Reset game state
+    gameState.tejitaLanzado = false;
+    gameState.cilindrosLanzados = [];
+    
+    const statusEl = document.getElementById('game-status');
+    if (statusEl) {
+        statusEl.textContent = 'Lanza el TEJITO primero';
+    }
+    
+    console.log('Game reset complete');
+};
+
+// Setup reset button
+document.addEventListener('DOMContentLoaded', function() {
+    const resetBtn = document.getElementById('reset-game');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', window.resetGame);
+    }
+});

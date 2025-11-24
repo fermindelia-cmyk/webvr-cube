@@ -113,6 +113,7 @@ function initControls(cylinderRef) {
             currentlyHeldObject = objectToHold; // Update global reference
             objectToHold.userData.velocity.set(0, 0, 0);
             objectToHold.userData.angularVelocity.set(0, 0, 0);
+            console.log('Grabbed object:', objectToHold.userData.isTejito ? 'TEJITO' : 'CILINDRO');
         }
 
         // === Direction Control (Mouse X) ===
@@ -128,19 +129,27 @@ function initControls(cylinderRef) {
         objectToHold.position.set(holdX, holdHeight, holdZ);
 
         // === Force Control (Mouse Y) ===
-        const force = (1 - mouseY) * 20;
+        const force = (1 - mouseY) * 40; // Increased from 20 to 40 for more visible throws
         
         objectToHold.userData.pcReleaseForce = force;
         objectToHold.userData.pcReleaseDirection = direction;
+        
+        console.log(`Hold: mouseX=${mouseX.toFixed(2)}, mouseY=${mouseY.toFixed(2)}, force=${force.toFixed(2)}, dir=${direction.toFixed(2)}`);
     };
 
     // Override the grip end behavior for PC
     window.releasePCCylinder = function(objToRelease) {
+        console.log('=== RELEASE CALLED ===');
+        console.log('objToRelease:', objToRelease);
+        console.log('objToRelease.userData.isHeld:', objToRelease?.userData?.isHeld);
+        
         if (!objToRelease || !objToRelease.userData.isHeld) {
             console.warn('releasePCCylinder: Invalid object to release');
             return;
         }
 
+        console.log('✓ Object is valid and held');
+        
         objToRelease.userData.isHeld = false;
         pcCylinderHeld = false;
         currentlyHeldObject = null;
@@ -149,13 +158,14 @@ function initControls(cylinderRef) {
         const force = objToRelease.userData.pcReleaseForce || 1;
         const direction = objToRelease.userData.pcReleaseDirection || 0;
 
-        console.log(`Launching with force: ${force}, direction: ${direction}`);
+        console.log(`📊 Release stats - force: ${force.toFixed(2)}, direction: ${direction.toFixed(2)}`);
 
         // Create velocity vector
         const velocityX = Math.sin(direction) * force;
         const velocityZ = -Math.cos(direction) * force;
         const velocityY = 0;
 
+        console.log(`🚀 Setting velocity: X=${velocityX.toFixed(2)}, Y=${velocityY}, Z=${velocityZ.toFixed(2)}`);
         objToRelease.userData.velocity.set(velocityX, velocityY, velocityZ);
 
         // Add spin
@@ -165,11 +175,11 @@ function initControls(cylinderRef) {
         // Mark tejito as thrown if applicable
         if (objToRelease.userData.isTejito && typeof window.gameState !== 'undefined') {
             window.gameState.tejitaLanzado = true;
-            console.log('TEJITO LANZADO!');
+            console.log('✓ TEJITO LANZADO!');
         }
 
-        // Reset position to origin for next throw
-        objToRelease.position.set(0, 0.5, 0);
+        console.log('Final velocity check:', objToRelease.userData.velocity);
+        console.log('=== RELEASE COMPLETE ===');
     };
 
     console.log('PC Controls initialized');
